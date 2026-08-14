@@ -38,7 +38,7 @@ import {
   X,
   Mic,
 } from "lucide-react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { toast } from "sonner";
 import { db, type InventoryItem } from "@/lib/db";
 
@@ -357,57 +357,79 @@ function StatusColumn({ status, items, onEdit, onDelete, onSeeAll }: { status: S
 
 function BarcodeScanner({ onClose, onDetected }: { onClose: () => void; onDetected: (value: string) => void }) {
   const [error, setError] = useState("");
+  const [manualInput, setManualInput] = useState("");
   const regionId = "shelfmark-barcode-reader";
 
   useEffect(() => {
     let scanner: Html5Qrcode | null = null;
     let isMounted = true;
+    let startPromise: Promise<any> | null = null;
 
-    const initTimer = setTimeout(() => {
-      if (!isMounted) return;
-      
+    const initScanner = async () => {
       try {
+        // Small delay to allow modal animation/DOM to settle
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        if (!isMounted) return;
+
         scanner = new Html5Qrcode(regionId);
-        scanner
-          .start(
-            { facingMode: "environment" },
-            { 
-              fps: 10, 
-              qrbox: { width: 250, height: 150 }, 
-              aspectRatio: 1.6,
-              disableFlip: false // Helps with some 1D barcodes
+        startPromise = scanner.start(
+          { facingMode: "environment" }, // Will fallback to user camera on laptops
+          { 
+            fps: 20, 
+            qrbox: { width: 300, height: 150 }, 
+            disableFlip: false,
+            // Native BarcodeDetector is much faster on modern browsers (Chrome/Edge)
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
             },
-            (decodedText) => {
-              if (isMounted) onDetected(decodedText);
-            },
-            () => undefined
-          )
-          .catch((err) => {
-            if (isMounted) {
-              console.error("Scanner error:", err);
-              setError("Camera access is unavailable. You can type the barcode instead.");
-            }
-          });
+            // Focus heavily on 1D retail barcodes to improve detection speed
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.CODE_39
+            ]
+          },
+          (decodedText) => {
+            if (isMounted) onDetected(decodedText);
+          },
+          () => undefined
+        );
+        await startPromise;
       } catch (err) {
-        if (isMounted) setError("Failed to initialize camera.");
+        if (isMounted) {
+          console.warn("Scanner error:", err);
+          setError("Camera access is unavailable. You can type the barcode instead.");
+        }
       }
-    }, 50);
+    };
+
+    initScanner();
 
     return () => {
       isMounted = false;
-      clearTimeout(initTimer);
       if (scanner) {
-        try {
-          // 2 represents SCANNING state in Html5QrcodeScannerState
-          if (scanner.getState() === 2) {
-            scanner.stop().then(() => {
-              scanner?.clear();
-            }).catch(() => undefined);
-          } else {
-            scanner.clear();
-          }
-        } catch (e) {
-          console.error("Scanner cleanup error:", e);
+        const cleanup = () => {
+          try {
+            if (scanner && scanner.getState() === 2 /* SCANNING */) {
+              scanner.stop().then(() => {
+                try { scanner?.clear(); } catch (e) {}
+              }).catch(() => {
+                try { scanner?.clear(); } catch (e) {}
+              });
+            } else {
+              try { scanner?.clear(); } catch (e) {}
+            }
+          } catch (e) {} // Catch all to prevent React Error Boundary crash
+        };
+
+        if (startPromise) {
+          // Wait for start to finish before attempting to stop
+          startPromise.then(cleanup).catch(cleanup);
+        } else {
+          cleanup();
         }
       }
     };
@@ -426,7 +448,25 @@ function BarcodeScanner({ onClose, onDetected }: { onClose: () => void; onDetect
         <div className="p-5">
           <div id={regionId} className="scanner-frame" aria-label="Barcode camera preview" />
           {error ? <div className="mt-3 rounded-xl bg-[#FBE5DF] px-3 py-2.5 text-xs font-bold leading-5 text-[#B84735]">{error}</div> : <p className="mt-3 text-xs leading-5 text-[#7B847C]">Point the camera at the product barcode. Nothing leaves this device.</p>}
-          <button type="button" onClick={onClose} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#DED7CE] bg-[#FBF8F3] px-4 py-3 text-xs font-extrabold text-[#59675E] transition hover:bg-[#FFFDF9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E45B45]">Enter barcode manually</button>
+          
+          <div className="mt-4 flex gap-2">
+            <input 
+              type="text" 
+              inputMode="numeric"
+              placeholder="Or type barcode here..." 
+              value={manualInput}
+              onChange={(e) => setManualInput(e.target.value)}
+              className="field-input flex-1"
+            />
+            <button 
+              type="button" 
+              onClick={() => { if(manualInput.trim()) onDetected(manualInput.trim()); else onClose(); }} 
+              className="flex items-center justify-center rounded-xl bg-[#17342B] px-4 py-3 text-xs font-extrabold text-white transition hover:bg-[#2b5948] focus-visible:outline-none"
+            >
+              Enter
+            </button>
+          </div>
+          <button type="button" onClick={onClose} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#DED7CE] bg-[#FBF8F3] px-4 py-3 text-xs font-extrabold text-[#59675E] transition hover:bg-[#FFFDF9] focus-visible:outline-none">Cancel</button>
         </div>
       </section>
     </div>
@@ -643,6 +683,42 @@ export default function Home() {
     setEditingItem(null);
     setForm(createEmptyForm());
     setIsFormOpen(true);
+  };
+
+  const handleBarcodeLookup = async (barcode: string) => {
+    setForm((current) => ({ ...current, barcode }));
+    setIsScannerOpen(false);
+
+    if (!isOnline) {
+      toast.success("Barcode captured.");
+      return;
+    }
+
+    const toastId = toast.loading("Looking up product details...");
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode}.json`);
+      if (!res.ok) throw new Error("API error");
+      const data = await res.json();
+      
+      if (data.status === 1 && data.product) {
+        const product = data.product;
+        const productName = product.product_name || product.product_name_en || "";
+        const category = product.categories_tags?.[0]?.replace(/en:/, "").replace(/-/g, " ") || "";
+        
+        if (productName) {
+          setForm((current) => ({ 
+            ...current, 
+            name: productName,
+            category: category ? category.charAt(0).toUpperCase() + category.slice(1) : current.category
+          }));
+          toast.success(`Found: ${productName}`, { id: toastId });
+          return;
+        }
+      }
+      toast.success("Barcode captured. (Not in global database)", { id: toastId });
+    } catch (err) {
+      toast.success("Barcode captured.", { id: toastId });
+    }
   };
 
   const openEditItem = (item: InventoryItem) => {
@@ -918,7 +994,7 @@ export default function Home() {
       </nav>
 
       {isFormOpen && <ItemSheet editingItem={editingItem} form={form} setForm={setForm} onClose={() => { setIsFormOpen(false); setIsScannerOpen(false); }} onSubmit={handleSubmit} onScanBarcode={() => setIsScannerOpen(true)} />}
-      {isScannerOpen && <BarcodeScanner onClose={() => setIsScannerOpen(false)} onDetected={(value) => { setForm((current) => ({ ...current, barcode: value })); setIsScannerOpen(false); toast.success("Barcode captured."); }} />}
+      {isScannerOpen && <BarcodeScanner onClose={() => setIsScannerOpen(false)} onDetected={handleBarcodeLookup} />}
       {isTransferOpen && <TransferSheet onClose={() => setIsTransferOpen(false)} onImport={handleImport} onExportJson={handleExportJson} onExportCsv={handleExportCsv} installEvent={installEvent} onInstall={handleInstall} />}
       <div className="fixed bottom-3 left-3 z-20 hidden items-center gap-2 rounded-full border border-[#E0D9D0] bg-[#FBF8F3]/80 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-[#889087] shadow-sm backdrop-blur sm:flex"><span className={`size-1.5 rounded-full ${isOnline ? "bg-[#6E9B78]" : "bg-[#E45B45]"}`} /> {isOnline ? "Saved on this device" : "Offline · changes stay local"}</div>
     </div>
