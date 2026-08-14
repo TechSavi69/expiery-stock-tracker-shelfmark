@@ -356,34 +356,47 @@ function StatusColumn({ status, items, onEdit, onDelete, onSeeAll }: { status: S
 }
 
 function BarcodeScanner({ onClose, onDetected }: { onClose: () => void; onDetected: (value: string) => void }) {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState("");
   const regionId = "shelfmark-barcode-reader";
 
   useEffect(() => {
-    const scanner = new Html5Qrcode(regionId);
-    scannerRef.current = scanner;
-    let finished = false;
+    let scanner: Html5Qrcode | null = null;
+    let isMounted = true;
 
-    scanner
-      .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.6 },
-        (decodedText) => {
-          if (finished) return;
-          finished = true;
-          onDetected(decodedText);
-          scanner.stop().catch(() => undefined);
-        },
-        () => undefined,
-      )
-      .catch(() => setError("Camera access is unavailable. You can type the barcode instead."));
+    // Small delay to allow DOM to settle and prevent Strict Mode double-initialization
+    const initTimer = setTimeout(() => {
+      if (!isMounted) return;
+      
+      try {
+        scanner = new Html5Qrcode(regionId);
+        scanner
+          .start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.6 },
+            (decodedText) => {
+              if (isMounted) onDetected(decodedText);
+            },
+            () => undefined // Ignore frame errors
+          )
+          .catch((err) => {
+            if (isMounted) {
+              console.error("Scanner error:", err);
+              setError("Camera access is unavailable. You can type the barcode instead.");
+            }
+          });
+      } catch (err) {
+        if (isMounted) setError("Failed to initialize camera.");
+      }
+    }, 50);
 
     return () => {
-      finished = true;
-      scanner.stop().catch(() => undefined);
-      scanner.clear();
-      scannerRef.current = null;
+      isMounted = false;
+      clearTimeout(initTimer);
+      if (scanner && scanner.isScanning) {
+        scanner.stop().then(() => {
+          scanner?.clear();
+        }).catch(() => undefined);
+      }
     };
   }, [onDetected]);
 
