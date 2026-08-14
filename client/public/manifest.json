@@ -1,0 +1,20 @@
+{
+  "name": "Shelfmark — Expiry & Stock Tracker",
+  "short_name": "Shelfmark",
+  "description": "An offline-first expiry and stock tracker for retail teams.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4efe8",
+  "theme_color": "#17342b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/shelfmark_logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
