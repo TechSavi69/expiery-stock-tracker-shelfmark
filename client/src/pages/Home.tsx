@@ -896,7 +896,7 @@ export default function Home() {
               <div className="absolute -bottom-36 left-1/3 size-72 rounded-full bg-[#9BB995]/10 blur-3xl" />
               <div className="relative flex items-start justify-between gap-6 sm:items-center">
                 <div className="max-w-xl">
-                  <div className="mb-4 flex items-center gap-2 font-sans text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#B6C7B7]"><Sparkles className="size-3.5 text-[#F2A18F]" /> Tuesday, August 12 · local shelf</div>
+                  <div className="mb-4 flex items-center gap-2 font-sans text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#B6C7B7]"><Sparkles className="size-3.5 text-[#F2A18F]" /> {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · local shelf</div>
                   <h1 className="max-w-[13ch] font-display text-[2.35rem] leading-[0.94] tracking-[-0.065em] sm:text-[3.7rem]">Keep the shelf <span className="text-[#F2A18F]">honest.</span></h1>
                   <p className="mt-3 max-w-md text-sm leading-6 text-[#D7E0D6] sm:mt-4 sm:text-[15px]">A clear view of what needs a look today, what can wait, and what is already safe in the back room.</p>
                   <div className="mt-5 flex flex-wrap gap-2.5 sm:mt-6">

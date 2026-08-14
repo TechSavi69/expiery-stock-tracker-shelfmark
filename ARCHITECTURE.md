@@ -29,6 +29,7 @@ graph TB
         WHATSAPP["💬 WhatsApp\n(wa.me deep link)"]
         FONTS["🔤 Google Fonts\n(DM Serif + Manrope)"]
         VERCEL["☁️ Vercel CDN\n(hosting)"]
+        OFF["🌐 Open Food Facts API\n(barcode product lookup)"]
     end
 
     USER["👤 Retail Worker"] --> UI
@@ -40,6 +41,8 @@ graph TB
     DIST --> UI
     UI --> WHATSAPP
     UI --> FONTS
+    UI -->|"barcode number"| OFF
+    OFF -->|"product name + category"| UI
     VERCEL --> SERVER
 ```
 
@@ -54,7 +57,7 @@ flowchart LR
     subgraph INPUT["Data Entry Methods"]
         MANUAL["⌨️ Manual Form\nTyped input"]
         VOICE["🎙️ Voice Command\nEn / Si / Ta"]
-        SCAN["📷 Barcode Scan\nCamera"]
+        SCAN["📷 Barcode Scan\nCamera or manual digits"]
         IMPORT["📂 JSON/CSV Import\nFile upload"]
     end
 
@@ -62,6 +65,7 @@ flowchart LR
         PARSE["🔍 parseVoiceCommand()\nNLP extraction"]
         VALIDATE["✅ Form Validation\nname, date, qty > 0"]
         NORMALIZE["🔧 normalizeImportedItem()\nData sanitization"]
+        LOOKUP["🌐 OpenFoodFacts API\nProduct name lookup"]
     end
 
     subgraph STORAGE["Storage Layer"]
@@ -79,12 +83,13 @@ flowchart LR
 
     MANUAL --> VALIDATE
     VOICE --> PARSE --> VALIDATE
-    SCAN --> VALIDATE
+    SCAN -->|"barcode digits"| LOOKUP
+    LOOKUP -->|"name + category auto-fill"| VALIDATE
     IMPORT --> NORMALIZE --> DEXIE
 
     VALIDATE --> DEXIE
     DEXIE <--> IDB
-    IDB -.->|"schema defined"| SCHEMA
+    IDB -.-|"schema defined"| SCHEMA
     IDB -->|"orderBy expiryDate"| FILTER
     FILTER --> CARDS
     FILTER --> EXPORT_W
@@ -245,9 +250,43 @@ erDiagram
 |---|---|---|
 | **Storage** | IndexedDB (Dexie.js) | Offline-first, no server costs, data stays on device |
 | **Voice** | Web Speech API | Free, browser-native, no API keys needed |
-| **Barcode** | html5-qrcode | Camera-based, works on any HTTPS page |
+| **Barcode Scan** | html5-qrcode | Camera-based, works on any HTTPS page; falls back to manual entry |
+| **Barcode Lookup** | Open Food Facts API | Free, open global database; auto-fills name + category from barcode |
 | **Routing** | Wouter | Tiny alternative to React Router (1.3kb) |
 | **Styling** | Tailwind CSS v4 + Custom CSS | Utility-first speed + bespoke "Paper Ledger" tokens |
 | **State** | React useState/useMemo | No Redux needed — all state is local and derived |
 | **Notifications** | Sonner | Elegant toast library with minimal footprint |
 | **Hosting** | Vercel | Zero-config deployment, global CDN, free tier |
+
+---
+
+## 9. Barcode Lookup Flow
+
+When a barcode is captured (camera scan or manual entry), `handleBarcodeLookup()` fires an async lookup:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FORM as "BarcodeScanner / Form"
+    participant FN as "handleBarcodeLookup()"
+    participant API as "Open Food Facts API"
+    participant STATE as "Form State"
+
+    User->>FORM: Scans or types barcode digits
+    FORM->>FN: onDetected(barcode)
+    FN->>STATE: barcode field filled immediately
+    FN->>FN: isOnline check
+    alt Online
+        FN->>API: GET /api/v2/product/{barcode}.json
+        API-->>FN: { status: 1, product: { product_name, categories_tags } }
+        alt Product found
+            FN->>STATE: name + category auto-filled
+            FN-->>User: Toast ✅ "Found: Coca-Cola"
+        else Not in database
+            FN-->>User: Toast ℹ️ "Not in global database"
+        end
+    else Offline
+        FN-->>User: Toast ✅ "Barcode captured"
+    end
+```
+

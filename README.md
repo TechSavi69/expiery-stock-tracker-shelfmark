@@ -18,13 +18,14 @@
 | 📦 **Inventory Ledger** | Add, edit, and delete stock items with name, category, quantity, and barcode |
 | 📅 **Expiry Tracking** | Items auto-categorized as Expired / Expiring Soon / Safe Stock |
 | 🎙️ **Voice Entry** | Speak to auto-fill the form — supports **English, Sinhala, and Tamil** |
-| 📷 **Barcode Scanner** | Scan barcodes using the device camera via `html5-qrcode` |
+| 📷 **Barcode Scanner** | Scan barcodes via camera or type manually — auto-fetches product name from **OpenFoodFacts** |
 | 💬 **WhatsApp Export** | One-tap to send today's expiring items list to any WhatsApp contact or group |
 | 📁 **JSON / CSV Export** | Full inventory backup — downloadable and re-importable |
 | 📲 **PWA / Installable** | Works as a home screen app on Android and iOS |
 | 🔔 **Sound Alerts** | Optional audio beep when urgent items are detected |
 | 🌐 **Offline-First** | All data stored locally in IndexedDB — zero backend required |
 | 🔍 **Search & Filter** | Filter by status, category, or free-text search |
+| 📅 **Live Date Header** | Dashboard always shows the current real date — never stale |
 
 ---
 
@@ -107,6 +108,26 @@ Shelfmark can be installed as a native-like app on any device:
 - **Android (Chrome):** Tap the **"Install"** prompt in the browser or use the menu → "Add to Home Screen"
 - **iOS (Safari):** Tap the Share button → "Add to Home Screen"
 - **Desktop:** Click the install icon in the Chrome address bar
+
+---
+
+## 📷 Barcode Scanning
+
+Shelfmark supports two methods for entering a barcode:
+
+1. **Camera Scan** — Click **"Scan"** next to the Barcode field. Point the device camera at a product barcode. Works best on **mobile phones** (laptop webcams often lack the macro autofocus needed for small barcodes).
+
+2. **Manual Entry** — In the scanner popup, type the barcode number directly in the text box and click **"Enter"**.
+
+Once a barcode is captured (either method), Shelfmark automatically contacts the **[Open Food Facts](https://world.openfoodfacts.org/)** free global database to look up the product name and category:
+
+| Works well for | May not be found |
+|---|---|
+| Coca-Cola, Pepsi, Sprite | Local Sri Lankan brands |
+| Nestlé, Unilever, P&G products | Pharmacy items (Vicks, etc.) |
+| Maggi, Nescafé, Milo | Handmade / unlabelled products |
+
+> If the product is not found, the barcode number is still saved and the form remains open for manual name entry.
 
 ---
 
