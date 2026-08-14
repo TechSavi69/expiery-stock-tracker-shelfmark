@@ -5,6 +5,10 @@
 
 ![Shelfmark Dashboard](./client/public/dashboard_illustration.png)
 
+[![Architecture Diagrams](https://img.shields.io/badge/📐_System_Architecture-View_Diagrams-17342B?style=for-the-badge)](./ARCHITECTURE.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-olive?style=for-the-badge)](./LICENSE)
+[![Vercel Deploy](https://img.shields.io/badge/Hosted_on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
+
 ---
 
 ## ✨ Features
