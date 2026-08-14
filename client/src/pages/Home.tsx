@@ -363,7 +363,6 @@ function BarcodeScanner({ onClose, onDetected }: { onClose: () => void; onDetect
     let scanner: Html5Qrcode | null = null;
     let isMounted = true;
 
-    // Small delay to allow DOM to settle and prevent Strict Mode double-initialization
     const initTimer = setTimeout(() => {
       if (!isMounted) return;
       
@@ -372,11 +371,16 @@ function BarcodeScanner({ onClose, onDetected }: { onClose: () => void; onDetect
         scanner
           .start(
             { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.6 },
+            { 
+              fps: 10, 
+              qrbox: { width: 250, height: 150 }, 
+              aspectRatio: 1.6,
+              disableFlip: false // Helps with some 1D barcodes
+            },
             (decodedText) => {
               if (isMounted) onDetected(decodedText);
             },
-            () => undefined // Ignore frame errors
+            () => undefined
           )
           .catch((err) => {
             if (isMounted) {
@@ -392,10 +396,19 @@ function BarcodeScanner({ onClose, onDetected }: { onClose: () => void; onDetect
     return () => {
       isMounted = false;
       clearTimeout(initTimer);
-      if (scanner && scanner.isScanning) {
-        scanner.stop().then(() => {
-          scanner?.clear();
-        }).catch(() => undefined);
+      if (scanner) {
+        try {
+          // 2 represents SCANNING state in Html5QrcodeScannerState
+          if (scanner.getState() === 2) {
+            scanner.stop().then(() => {
+              scanner?.clear();
+            }).catch(() => undefined);
+          } else {
+            scanner.clear();
+          }
+        } catch (e) {
+          console.error("Scanner cleanup error:", e);
+        }
       }
     };
   }, [onDetected]);
